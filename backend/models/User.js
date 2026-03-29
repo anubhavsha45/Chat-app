@@ -26,6 +26,12 @@ const userSchema = new mongoose.Schema({
       message: "Your password and password confirm fields do not match",
     },
   },
+  role: {
+    type: String,
+    enum: ["user", "admin"],
+    default: "user",
+  },
+  passwordChangedAt: Date,
   profilePic: {
     type: String,
     default: "",
@@ -45,6 +51,19 @@ userSchema.methods.correctPassword = async function (
   userPassword,
 ) {
   return await bcrypt.compare(candidatePassword, userPassword);
+};
+
+userSchema.methods.changedPassword = function (JWTTimestamp) {
+  if (this.passwordChangedAt) {
+    const changedTimestamp = parseInt(
+      this.passwordChangedAt.getTime() / 1000,
+      10,
+    );
+
+    return JWTTimestamp < changedTimestamp;
+  }
+
+  return false;
 };
 const User = mongoose.model("User", userSchema);
 module.exports = User;
