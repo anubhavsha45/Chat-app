@@ -2,8 +2,10 @@ const appError = require("./../utils/appError");
 const catchAsync = require("./../utils/catchAsync");
 const Message = require("./../models/Message");
 const Conversation = require("./../models/Conversation");
-
+const { getIO, onlineUsers } = require("../socket");
 exports.sendMessage = catchAsync(async (req, res, next) => {
+  const io = getIO();
+
   const { receiverId, content } = req.body;
 
   if (!receiverId || !content) {
@@ -44,6 +46,15 @@ exports.sendMessage = catchAsync(async (req, res, next) => {
   // Populate sender
   const populatedMessage = await message.populate("sender", "name email");
 
+  //find reciever socket
+  const receiverSocketId = onlineUsers.get(receiverId);
+
+  if (receiverSocketId) {
+    io.to(receiverSocketId).emit("receiveMessage", {
+      message: populatedMessage,
+    });
+  }
+
   res.status(201).json({
     status: "success",
     data: {
@@ -59,7 +70,7 @@ exports.getMessage = catchAsync(async (req, res, next) => {
   const conversation = await Conversation.findById(convoId);
 
   if (!conversation) {
-    return next(new AppError("Conversation not found", 404));
+    return next(new appError("Conversation not found", 404));
   }
 
   // 2. Security check
@@ -68,7 +79,7 @@ exports.getMessage = catchAsync(async (req, res, next) => {
   );
 
   if (!isUserInConversation) {
-    return next(new AppError("You are not part of this conversation", 403));
+    return next(new appError("You are not part of this conversation", 403));
   }
 
   // 3. Get messages (AFTER auth check)
